@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Medical Analysis System - Dashboard</title>
+    <title>EDGE AI DIAGNOSTIC ASSISTANT - Dashboard</title>
     <link rel="stylesheet" href="styles.css">
     <style>
         .page-tabs {
@@ -48,7 +48,7 @@
     <div class="dashboard-container">
         <!-- Header -->
         <div class="dashboard-header">
-            <h1>Medical Analysis System</h1>
+            <h1>EDGE AI DIAGNOSTIC ASSISTANT</h1>
             <button class="logout-btn" onclick="handleLogout()">Logout</button>
         </div>
 
@@ -74,14 +74,17 @@
                     <small id="imageFileName">No file chosen</small>
                 </div>
 
-                <button class="btn" onclick="analyzeData()" style="margin-top: 20px;">Analyze Image</button>
-
-                <!-- Suggest Conditions Section -->
-                <div class="input-section" style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #ddd;">
-                    <h3>Suggest Conditions for Analysis</h3>
-                    <textarea id="conditionInput" placeholder="Enter condition name or description..." style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: Arial; resize: vertical; min-height: 80px;"></textarea>
-                    <button class="btn" onclick="suggestCondition()" style="margin-top: 10px;">Add Condition</button>
+                <!-- Conditions Section -->
+                <div class="input-section" style="margin-top: 20px;">
+                    <h3>Conditions to Check</h3>
+                    <p style="font-size: 13px; color: #666; margin-bottom: 8px;">Enter comma-separated conditions (e.g. Pneumonia, Normal, Tuberculosis)</p>
+                    <textarea id="conditionsInput" placeholder="Pneumonia, Normal, Tuberculosis" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: Arial; resize: vertical; min-height: 70px; box-sizing: border-box;">Pneumonia, Normal, Tuberculosis</textarea>
                 </div>
+
+                <button class="btn" onclick="analyzeData()" style="margin-top: 20px; width: 100%;">🔬 Analyze Image</button>
+
+                <!-- API Status -->
+                <div id="visionApiStatus" style="margin-top: 15px; padding: 8px 12px; border-radius: 4px; font-size: 13px; display: none;"></div>
             </div>
 
             <!-- Middle Panel - Preview -->
@@ -109,48 +112,64 @@
 
         <!-- PAGE 2: Therapeutic Tasks -->
         <div id="page2" class="page-content">
-            <!-- Top Section: Upload & Task Selection Side by Side -->
-            <div style="padding: 0 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
-                
-                <!-- Therapeutic Data Upload -->
-                <div style="background-color: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
-                    <h3>Upload Therapeutic Data</h3>
-                    <input type="file" id="therapeuticData" accept=".txt,.pdf,.docx" onchange="handleDataUpload(event)">
-                    <small id="dataFileName" style="display: block; margin: 10px 0; color: #666;">No file chosen</small>
-                    <button class="btn" onclick="analyzeTherapeuticData()" style="background-color: #2196F3; width: 100%;">Analyze Therapeutic Data</button>
-                </div>
-                
-                <!-- Task Selection Dropdown -->
-                <div style="background-color: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
-                    <h3>Select Therapeutic Task</h3>
-                    <select id="taskDropdown" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; margin-bottom: 10px;">
-                        <option value="">-- Select a task --</option>
-                    </select>
-                    <button class="btn" onclick="addSelectedTask()" style="background-color: #4CAF50; width: 100%;">Assign Task</button>
-                </div>
-            </div>
+            <div style="padding: 0 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; align-items: start;">
 
-            <!-- Therapeutic Data Preview -->
-            <div style="padding: 0 20px; margin-bottom: 30px;">
-                <div style="background-color: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
-                    <h3>Therapeutic Data Preview</h3>
-                    <div id="therapeuticPreviewContent" style="padding: 15px; background-color: #f9f9f9; border-radius: 4px; min-height: 100px; color: #999;">
-                        <p>No therapeutic data uploaded</p>
+                <!-- Left: Task selection + SMILES input -->
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <!-- Task Selection -->
+                    <div style="background-color: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
+                        <h3 style="margin-top: 0;">Select Prediction Task</h3>
+                        <p style="font-size: 13px; color: #666; margin-bottom: 8px;">Each task maps to a TxGemma prompt template.</p>
+                        <select id="taskDropdown" onchange="onTaskSelected()" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; margin-bottom: 10px;">
+                            <option value="">-- Select a task --</option>
+                        </select>
+                        <div id="taskDescriptionBox" style="font-size: 13px; color: #555; padding: 8px; background: #f9f9f9; border-radius: 4px; min-height: 36px;"></div>
+                    </div>
+
+                    <!-- Drug SMILES Input -->
+                    <div style="background-color: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
+                        <h3 style="margin-top: 0;">Drug SMILES String</h3>
+                        <p style="font-size: 13px; color: #666; margin-bottom: 8px;">Enter the SMILES notation of the molecule to analyse.</p>
+                        <textarea id="drugSmilesInput" placeholder="e.g. C1=CC=C(C=C1)C(C2=CC=CC=C2)O" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; resize: vertical; min-height: 70px; box-sizing: border-box;"></textarea>
+                    </div>
+
+                    <!-- Additional question -->
+                    <div style="background-color: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
+                        <h3 style="margin-top: 0;">Additional Question <span style="font-weight: normal; font-size: 13px; color: #999;">(optional)</span></h3>
+                        <input type="text" id="additionalQuestionInput" placeholder="e.g. Explain your reasoning." style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; box-sizing: border-box;">
+                    </div>
+
+                    <button class="btn" onclick="analyzeTherapeuticData()" style="background-color: #2196F3; width: 100%;">💊 Run TxGemma Analysis</button>
+                    <div id="txApiStatus" style="padding: 8px 12px; border-radius: 4px; font-size: 13px; display: none;"></div>
+                </div>
+
+                <!-- Right: Prompt preview + results -->
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <!-- Prompt template preview -->
+                    <div style="background-color: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
+                        <h3 style="margin-top: 0;">Prompt Template Preview</h3>
+                        <pre id="promptTemplatePreview" style="white-space: pre-wrap; word-break: break-word; background: #f4f4f4; padding: 12px; border-radius: 4px; font-size: 12px; min-height: 80px; color: #444; margin: 0;">Select a task to see its prompt template.</pre>
+                    </div>
+
+                    <!-- Analysis result -->
+                    <div style="background-color: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
+                        <h3 style="margin-top: 0;">Analysis Results</h3>
+                        <div id="therapeuticResultsContent" style="padding: 15px; background-color: #f9f9f9; border-radius: 4px; min-height: 120px; color: #999; white-space: pre-wrap; font-size: 14px;">
+                            Results will appear here after analysis.
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Assigned Tasks Section -->
-            <div style="padding: 0 20px;">
-                <h2>Assigned Therapeutic Tasks</h2>
-                
-                <!-- Assigned Tasks List -->
-                <div class="tasks-list" style="padding: 20px; background-color: white; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 30px;">
+            <!-- Assigned Tasks History -->
+            <div style="padding: 0 20px; margin-bottom: 30px;">
+                <h2>Analysis History</h2>
+                <div style="padding: 20px; background-color: white; border: 1px solid #ddd; border-radius: 5px;">
                     <table style="width: 100%; border-collapse: collapse; background-color: white;">
                         <thead>
                             <tr style="background-color: #f0f0f0; border-bottom: 2px solid #ddd;">
-                                <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Title</th>
-                                <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Description</th>
+                                <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Task</th>
+                                <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Drug SMILES</th>
                                 <th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Category</th>
                                 <th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Status</th>
                                 <th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Actions</th>
@@ -158,7 +177,7 @@
                         </thead>
                         <tbody id="tasksList">
                             <tr>
-                                <td colspan="5" style="padding: 20px; text-align: center; color: #999; border: 1px solid #ddd;">No tasks assigned yet.</td>
+                                <td colspan="5" style="padding: 20px; text-align: center; color: #999; border: 1px solid #ddd;">No analyses run yet. Select a task and run TxGemma analysis to get started!</td>
                             </tr>
                         </tbody>
                     </table>
